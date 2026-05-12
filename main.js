@@ -80,18 +80,29 @@ form.addEventListener('submit', e => {
   btn.textContent = '送信中...';
   btn.disabled = true;
 
-  // Simulate async send (replace with actual fetch to backend)
-  setTimeout(() => {
-    btn.textContent = '送信完了';
-    form.reset();
-    const note = document.createElement('p');
-    note.style.cssText = 'color:#1a7a3c;font-size:.88rem;margin-top:8px;';
-    note.textContent = 'お問い合わせを受け付けました。内容を確認の上、代表より折り返しご連絡いたします。';
-    form.appendChild(note);
-    setTimeout(() => {
-      btn.textContent = '送信する';
-      btn.disabled = false;
-      note.remove();
-    }, 6000);
-  }, 1200);
+  fetch(form.action, {
+    method: 'POST',
+    body: new FormData(form),
+    headers: { 'Accept': 'application/json' }
+  }).then(res => {
+    if (res.ok) {
+      form.reset();
+      btn.textContent = '送信完了';
+      const note = document.createElement('p');
+      note.style.cssText = 'color:#1a7a3c;font-size:.88rem;margin-top:8px;';
+      note.textContent = 'お問い合わせを受け付けました。内容を確認の上、代表より折り返しご連絡いたします。';
+      form.appendChild(note);
+      setTimeout(() => {
+        btn.textContent = '送信する';
+        btn.disabled = false;
+        note.remove();
+      }, 6000);
+    } else {
+      throw new Error();
+    }
+  }).catch(() => {
+    btn.textContent = '送信する';
+    btn.disabled = false;
+    alert('送信に失敗しました。時間をおいて再度お試しください。');
+  });
 });
