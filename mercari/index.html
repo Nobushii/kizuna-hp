@@ -417,8 +417,9 @@
     <div class="fg"><label>タイトル *</label><input type="text" id="e-title" /></div>
     <div class="frow">
       <div class="fg"><label>著者</label><input type="text" id="e-author" /></div>
-      <div class="fg"><label>ISBN</label><input type="text" id="e-isbn" /></div>
+      <div class="fg"><label>巻数</label><input type="number" id="e-volume" min="1" placeholder="例: 11" /></div>
     </div>
+    <div class="fg"><label>ISBN</label><input type="text" id="e-isbn" /></div>
     <div class="frow">
       <div class="fg"><label>出品価格 (円)</label><input type="number" id="e-price" min="0" /></div>
       <div class="fg"><label>仕入れ値 (円)</label><input type="number" id="e-cost" min="0" /></div>
@@ -527,12 +528,13 @@ function renderBooks() {
     const dateStr = b.status === '売れた' && b.soldDate
       ? '売れた日: ' + b.soldDate
       : b.listedDate ? '出品日: ' + b.listedDate : '';
+    const sub = [b.volume ? b.volume+'巻' : '', b.author ? esc(b.author) : ''].filter(Boolean).join(' · ');
     return `<div class="book-card" onclick="openEdit('${b.id}')">
       <div class="card-top">
         <div class="book-title">${esc(b.title)}</div>
         <div class="badge ${b.status}">${b.status}</div>
       </div>
-      ${b.author ? `<div class="book-author">${esc(b.author)}</div>` : ''}
+      ${sub ? `<div class="book-author">${sub}</div>` : ''}
       <div class="book-prices">
         <div class="price">¥${b.price.toLocaleString()}</div>
         ${b.cost ? `<div class="cost">仕入 ¥${b.cost.toLocaleString()}</div>` : ''}
@@ -634,6 +636,7 @@ function applyAction({ action, data }) {
       id:         uid(),
       title:      data.title      || '無題',
       author:     data.author     || '',
+      volume:     data.volume     ? Number(data.volume) : null,
       isbn:       data.isbn       || '',
       price:      Number(data.price) || 0,
       cost:       Number(data.cost)  || 0,
@@ -663,7 +666,7 @@ ${JSON.stringify(books.map(b => ({ id:b.id, title:b.title, author:b.author, pric
 {"message":"日本語返答","actions":[{"action":"add|update|delete|mark_sold|none","data":{...}}]}
 
 ルール:
-- add: title,author,isbn,price,cost,status(デフォルト:出品中),listedDate,soldDate,memo
+- add: title,author,volume(巻数・数値),isbn,price,cost,status(デフォルト:出品中),listedDate,soldDate,memo
 - update: id(必須)+変更フィールド / delete: id(必須) / mark_sold: id,soldDate(省略=今日${today()})
 - 口語・フィラー語（えーと/あのー等）は無視して意図を解釈
 - 複数冊はactionsの配列で処理
@@ -730,6 +733,7 @@ function openEdit(id) {
   editId = id;
   el('e-title').value  = b.title;
   el('e-author').value = b.author  || '';
+  el('e-volume').value = b.volume  || '';
   el('e-isbn').value   = b.isbn    || '';
   el('e-price').value  = b.price   || '';
   el('e-cost').value   = b.cost    || '';
@@ -752,6 +756,7 @@ function saveBook() {
     ...books[i],
     title,
     author:     el('e-author').value.trim(),
+    volume:     el('e-volume').value ? Number(el('e-volume').value) : null,
     isbn:       el('e-isbn').value.trim(),
     price:      Number(el('e-price').value) || 0,
     cost:       Number(el('e-cost').value)  || 0,
