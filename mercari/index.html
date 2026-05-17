@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>メルカリ本在庫管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f0f11;
+      --surface: #1a1a1f;
+      --surface2: #22222a;
+      --border: #2a2a35;
+      --text: #e8e8f0;
+      --muted: #888;
+      --red: #ff4d6d;
+      --yellow: #ffd166;
+      --green: #06d6a0;
+      --blue: #4fc3f7;
+      --mono: 'Space Mono', monospace;
+      --sans: 'Noto Sans JP', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-shrink: 0;
+    }
+    .logo {
+      font-family: var(--mono);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--red);
+      white-space: nowrap;
+    }
+    .stats { display: flex; gap: 24px; flex: 1; }
+    .stat { display: flex; flex-direction: column; align-items: center; }
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .stat.s-active .stat-value { color: var(--yellow); }
+    .stat.s-sold .stat-value  { color: var(--green); }
+    .stat.s-profit .stat-value { color: var(--green); }
+    .neg { color: var(--red) !important; }
+
+    /* API Banner */
+    .api-banner {
+      background: #1e1216;
+      border-bottom: 1px solid var(--red);
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .api-banner span { font-size: 13px; color: var(--red); white-space: nowrap; }
+    .api-banner input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: var(--mono);
+      outline: none;
+    }
+    .api-banner button {
+      background: var(--red);
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .hidden { display: none !important; }
+
+    /* Layout */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Inventory Panel */
+    .inv-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid var(--border);
+    }
+    .filter-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .ftab {
+      padding: 10px 18px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .ftab:hover { color: var(--text); }
+    .ftab.active { color: var(--yellow); border-bottom-color: var(--yellow); }
+    .ftab .cnt {
+      display: inline-block;
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 11px;
+      margin-left: 5px;
+    }
+    .book-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      align-content: start;
+    }
+    .book-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .book-card:hover { border-color: var(--yellow); transform: translateY(-1px); }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .book-title { font-weight: 500; font-size: 14px; line-height: 1.4; flex: 1; }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .badge.出品中  { background: #0d2e1e; color: var(--green); }
+    .badge.下書き  { background: #2a2a0a; color: var(--yellow); }
+    .badge.値下げ中 { background: #2a0a0f; color: var(--red); }
+    .badge.売れた  { background: #0a1e2e; color: var(--blue); }
+    .book-author { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .book-prices { display: flex; align-items: center; gap: 10px; }
+    .price { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--yellow); }
+    .cost  { font-size: 12px; color: var(--muted); }
+    .profit { font-family: var(--mono); font-size: 13px; margin-left: auto; }
+    .profit.pos { color: var(--green); }
+    .profit.neg { color: var(--red); }
+    .book-memo { margin-top: 8px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 8px; }
+    .book-date { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .empty {
+      grid-column: 1/-1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty h3 { font-size: 32px; margin-bottom: 8px; }
+
+    /* Chat Panel */
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .chat-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .chat-msgs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .msg { max-width: 85%; }
+    .msg.user { align-self: flex-end; }
+    .msg.assistant { align-self: flex-start; }
+    .msg.system { align-self: center; max-width: 100%; }
+    .bubble {
+      padding: 9px 13px;
+      border-radius: 14px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .msg.user .bubble      { background: var(--red); color: white; border-bottom-right-radius: 4px; }
+    .msg.assistant .bubble { background: var(--surface2); border-bottom-left-radius: 4px; }
+    .msg.system .bubble    { background: transparent; color: var(--muted); font-size: 12px; font-style: italic; text-align: center; }
+    .typing {
+      display: flex;
+      gap: 4px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-radius: 14px;
+      border-bottom-left-radius: 4px;
+      width: fit-content;
+    }
+    .dot {
+      width: 6px; height: 6px;
+      background: var(--muted);
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .dot:nth-child(2) { animation-delay: .2s; }
+    .dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40%          { transform: translateY(-6px); }
+    }
+    .chat-input-area {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .chat-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-family: var(--sans);
+      resize: none;
+      outline: none;
+      max-height: 120px;
+      line-height: 1.5;
+    }
+    .chat-input:focus { border-color: var(--yellow); }
+    .chat-input::placeholder { color: var(--muted); }
+    .btn-icon {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      transition: all 0.15s;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+    .btn-icon:hover { border-color: var(--yellow); }
+    .btn-icon.recording { background: var(--red); border-color: var(--red); animation: pulse 1s infinite; }
+    .btn-send { background: var(--yellow); border-color: var(--yellow); color: #0f0f11; }
+    .btn-send:hover { opacity: 0.85; }
+    .btn-send:disabled { opacity: 0.35; cursor: not-allowed; }
+    @keyframes pulse {
+      0%,100% { transform: scale(1); }
+      50%      { transform: scale(1.1); }
+    }
+
+    /* Modal */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 20px;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%; max-width: 480px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 {
+      font-size: 16px; margin-bottom: 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+    .fg { margin-bottom: 14px; }
+    .fg label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    .fg input, .fg select, .fg textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: var(--sans);
+      outline: none;
+    }
+    .fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--yellow); }
+    .fg textarea { resize: vertical; min-height: 60px; }
+    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+    .btn { padding: 9px 20px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: var(--yellow); color: #0f0f11; font-weight: 700; }
+    .btn-danger  { background: var(--red); color: white; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 768px) {
+      main { grid-template-columns: 1fr; }
+      .chat-panel { height: 360px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📚 メルカリ在庫</div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="st-total">0</div>
+      <div class="stat-label">総在庫</div>
+    </div>
+    <div class="stat s-active">
+      <div class="stat-value" id="st-active">0</div>
+      <div class="stat-label">出品中</div>
+    </div>
+    <div class="stat s-sold">
+      <div class="stat-value" id="st-sold">0</div>
+      <div class="stat-label">売れた</div>
+    </div>
+    <div class="stat s-profit">
+      <div class="stat-value" id="st-profit">¥0</div>
+      <div class="stat-label">累計利益</div>
+    </div>
+  </div>
+</header>
+
+<div class="api-banner" id="api-banner">
+  <span>🔑 Anthropic APIキー</span>
+  <input type="password" id="api-key-input" placeholder="sk-ant-..." />
+  <button onclick="saveApiKey()">保存</button>
+</div>
+
+<main>
+  <div class="inv-panel">
+    <div class="filter-tabs">
+      <div class="ftab active" onclick="setFilter('all',this)">全て<span class="cnt" id="c-all">0</span></div>
+      <div class="ftab" onclick="setFilter('active',this)">出品中<span class="cnt" id="c-active">0</span></div>
+      <div class="ftab" onclick="setFilter('sold',this)">売れた<span class="cnt" id="c-sold">0</span></div>
+      <div class="ftab" onclick="setFilter('draft',this)">下書き<span class="cnt" id="c-draft">0</span></div>
+      <div class="ftab" onclick="setFilter('reduced',this)">値下げ中<span class="cnt" id="c-reduced">0</span></div>
+    </div>
+    <div class="book-list" id="book-list"></div>
+  </div>
+
+  <div class="chat-panel">
+    <div class="chat-header">💬 AIチャット — 自然言語で在庫を操作</div>
+    <div class="chat-msgs" id="chat-msgs"></div>
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chat-input" rows="1"
+        placeholder="例：ワンピース1巻を300円で仕入れて500円で出品した"
+        onkeydown="onKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="btn-icon" id="btn-mic" onclick="toggleVoice()" title="音声入力">🎤</button>
+      <button class="btn-icon btn-send" id="btn-send" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+</main>
+
+<!-- Edit Modal -->
+<div class="overlay hidden" id="overlay" onclick="onOverlayClick(event)">
+  <div class="modal">
+    <h2>本を編集 <button class="modal-close" onclick="closeModal()">×</button></h2>
+    <div class="fg"><label>タイトル *</label><input type="text" id="e-title" /></div>
+    <div class="frow">
+      <div class="fg"><label>著者</label><input type="text" id="e-author" /></div>
+      <div class="fg"><label>ISBN</label><input type="text" id="e-isbn" /></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>出品価格 (円)</label><input type="number" id="e-price" min="0" /></div>
+      <div class="fg"><label>仕入れ値 (円)</label><input type="number" id="e-cost" min="0" /></div>
+    </div>
+    <div class="fg">
+      <label>ステータス</label>
+      <select id="e-status">
+        <option>出品中</option><option>下書き</option><option>値下げ中</option><option>売れた</option>
+      </select>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>出品日</label><input type="date" id="e-listed" /></div>
+      <div class="fg"><label>売れた日</label><input type="date" id="e-sold" /></div>
+    </div>
+    <div class="fg"><label>メモ</label><textarea id="e-memo"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="deleteBook()">削除</button>
+      <button class="btn btn-ghost"  onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveBook()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────
+let books    = [];
+let history  = [];   // chat history [{role,content}]
+let filter   = 'all';
+let editId   = null;
+let apiKey   = '';
+let loading  = false;
+let isRec    = false;
+let recog    = null;
+
+// ── Boot ─────────────────────────────────────────────────
+(function init() {
+  books  = JSON.parse(localStorage.getItem('m_books') || '[]');
+  apiKey = localStorage.getItem('m_apikey') || '';
+  if (apiKey) hide('api-banner');
+  renderAll();
+  sysMsg('こんにちは！在庫の操作を自然言語で話しかけてください。\n例：「ワンピース1巻を300円で仕入れ500円で出品した」');
+})();
+
+// ── API Key ───────────────────────────────────────────────
+function saveApiKey() {
+  const v = document.getElementById('api-key-input').value.trim();
+  if (!v.startsWith('sk-ant-')) { alert('APIキーは sk-ant- で始まります'); return; }
+  apiKey = v;
+  localStorage.setItem('m_apikey', apiKey);
+  hide('api-banner');
+  sysMsg('APIキーを保存しました。');
+}
+
+// ── Render ────────────────────────────────────────────────
+function renderAll() { renderStats(); renderBooks(); renderCounts(); }
+
+function calcProfit(b) { return Math.round(b.price * 0.9 - b.cost); }
+
+function renderStats() {
+  const total  = books.length;
+  const active = books.filter(b => b.status === '出品中').length;
+  const sold   = books.filter(b => b.status === '売れた').length;
+  const profit = books.filter(b => b.status === '売れた').reduce((s,b) => s + calcProfit(b), 0);
+  el('st-total').textContent  = total;
+  el('st-active').textContent = active;
+  el('st-sold').textContent   = sold;
+  const pe = el('st-profit');
+  pe.textContent = '¥' + profit.toLocaleString();
+  pe.classList.toggle('neg', profit < 0);
+}
+
+function renderCounts() {
+  el('c-all').textContent     = books.length;
+  el('c-active').textContent  = books.filter(b => b.status === '出品中').length;
+  el('c-sold').textContent    = books.filter(b => b.status === '売れた').length;
+  el('c-draft').textContent   = books.filter(b => b.status === '下書き').length;
+  el('c-reduced').textContent = books.filter(b => b.status === '値下げ中').length;
+}
+
+function filtered() {
+  const map = { all:null, active:'出品中', sold:'売れた', draft:'下書き', reduced:'値下げ中' };
+  const s = map[filter];
+  return s ? books.filter(b => b.status === s) : books;
+}
+
+function renderBooks() {
+  const list = el('book-list');
+  const items = filtered();
+  if (!items.length) {
+    list.innerHTML = '<div class="empty"><h3>📦</h3><p>在庫がありません</p></div>';
+    return;
+  }
+  list.innerHTML = items.map(b => {
+    const p  = calcProfit(b);
+    const pc = p >= 0 ? 'pos' : 'neg';
+    const ps = (p >= 0 ? '+' : '') + '¥' + p.toLocaleString();
+    const dateStr = b.status === '売れた' && b.soldDate
+      ? '売れた日: ' + b.soldDate
+      : b.listedDate ? '出品日: ' + b.listedDate : '';
+    return `<div class="book-card" onclick="openEdit('${b.id}')">
+      <div class="card-top">
+        <div class="book-title">${esc(b.title)}</div>
+        <div class="badge ${b.status}">${b.status}</div>
+      </div>
+      ${b.author ? `<div class="book-author">${esc(b.author)}</div>` : ''}
+      <div class="book-prices">
+        <div class="price">¥${b.price.toLocaleString()}</div>
+        ${b.cost ? `<div class="cost">仕入 ¥${b.cost.toLocaleString()}</div>` : ''}
+        <div class="profit ${pc}">${ps}</div>
+      </div>
+      ${b.memo   ? `<div class="book-memo">${esc(b.memo)}</div>`       : ''}
+      ${dateStr  ? `<div class="book-date">${dateStr}</div>`           : ''}
+    </div>`;
+  }).join('');
+}
+
+function setFilter(f, tab) {
+  filter = f;
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  renderBooks();
+}
+
+// ── Chat ──────────────────────────────────────────────────
+function sysMsg(text) { appendMsg('system', text); }
+function appendMsg(role, text) {
+  const c = el('chat-msgs');
+  const d = document.createElement('div');
+  d.className = 'msg ' + role;
+  d.innerHTML = `<div class="bubble">${esc(text)}</div>`;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+function showTyping() {
+  const c = el('chat-msgs');
+  const d = document.createElement('div');
+  d.id = 'typing'; d.className = 'msg assistant';
+  d.innerHTML = '<div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+function hideTyping() { const t = document.getElementById('typing'); if(t) t.remove(); }
+
+function onKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+
+async function sendMessage() {
+  if (loading) return;
+  const inp = el('chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  if (!apiKey) {
+    document.getElementById('api-banner').classList.remove('hidden');
+    sysMsg('APIキーを上のバナーから入力してください。');
+    return;
+  }
+
+  inp.value = ''; inp.style.height = 'auto';
+  appendMsg('user', text);
+  history.push({ role: 'user', content: text });
+
+  loading = true;
+  el('btn-send').disabled = true;
+  showTyping();
+
+  try {
+    const raw = await callAI();
+    hideTyping();
+
+    let parsed;
+    try {
+      const m = raw.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(m ? m[0] : raw);
+    } catch {
+      appendMsg('assistant', raw);
+      history.push({ role: 'assistant', content: raw });
+      return;
+    }
+
+    const reply = parsed.message || '処理しました。';
+    appendMsg('assistant', reply);
+    history.push({ role: 'assistant', content: reply });
+
+    const actions = parsed.actions
+      || (parsed.action ? [{ action: parsed.action, data: parsed.data }] : []);
+    actions.forEach(applyAction);
+
+    persist();
+    renderAll();
+  } catch (err) {
+    hideTyping();
+    appendMsg('assistant', 'エラー: ' + err.message);
+  } finally {
+    loading = false;
+    el('btn-send').disabled = false;
+  }
+}
+
+function applyAction({ action, data }) {
+  if (!action || action === 'none') return;
+  if (action === 'add') {
+    books.push({
+      id:         uid(),
+      title:      data.title      || '無題',
+      author:     data.author     || '',
+      isbn:       data.isbn       || '',
+      price:      Number(data.price) || 0,
+      cost:       Number(data.cost)  || 0,
+      status:     data.status     || '出品中',
+      listedDate: data.listedDate || today(),
+      soldDate:   data.soldDate   || '',
+      memo:       data.memo       || '',
+    });
+  } else if (action === 'update') {
+    const i = books.findIndex(b => b.id === data.id);
+    if (i !== -1) books[i] = { ...books[i], ...data };
+  } else if (action === 'delete') {
+    books = books.filter(b => b.id !== data.id);
+  } else if (action === 'mark_sold') {
+    const i = books.findIndex(b => b.id === data.id);
+    if (i !== -1) { books[i].status = '売れた'; books[i].soldDate = data.soldDate || today(); }
+  }
+}
+
+async function callAI() {
+  const sys = `あなたはメルカリ本在庫管理AIです。必ず以下のJSONのみで返答してください。
+
+現在の在庫:
+${JSON.stringify(books.map(b => ({ id:b.id, title:b.title, author:b.author, price:b.price, cost:b.cost, status:b.status })))}
+
+返答形式（JSON以外の文字列を含めないこと）:
+{"message":"日本語返答","actions":[{"action":"add|update|delete|mark_sold|none","data":{...}}]}
+
+ルール:
+- add: title,author,isbn,price,cost,status(デフォルト:出品中),listedDate,soldDate,memo
+- update: id(必須)+変更フィールド / delete: id(必須) / mark_sold: id,soldDate(省略=今日${today()})
+- 口語・フィラー語（えーと/あのー等）は無視して意図を解釈
+- 複数冊はactionsの配列で処理
+- 在庫操作なしの質問はaction:"none"`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: sys,
+      messages: history.slice(-12),
+    })
+  });
+
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    throw new Error(e.error?.message || 'HTTP ' + res.status);
+  }
+  const d = await res.json();
+  return d.content[0].text;
+}
+
+// ── Voice ─────────────────────────────────────────────────
+function toggleVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('音声入力はChrome/Edgeでご利用ください（https環境必須）'); return; }
+  isRec ? stopVoice() : startVoice(SR);
+}
+function startVoice(SR) {
+  recog = new SR();
+  recog.lang = 'ja-JP'; recog.interimResults = true; recog.continuous = false;
+  recog.onstart  = () => { isRec = true; el('btn-mic').classList.add('recording'); };
+  recog.onresult = e => {
+    let fin = '', int = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) fin += e.results[i][0].transcript;
+      else int += e.results[i][0].transcript;
+    }
+    const inp = el('chat-input');
+    inp.value = fin || int;
+    autoResize(inp);
+    if (fin) { stopVoice(); sendMessage(); }
+  };
+  recog.onerror = () => stopVoice();
+  recog.onend   = () => stopVoice();
+  recog.start();
+}
+function stopVoice() {
+  recog?.stop(); recog = null;
+  isRec = false; el('btn-mic').classList.remove('recording');
+}
+
+// ── Modal ─────────────────────────────────────────────────
+function openEdit(id) {
+  const b = books.find(b => b.id === id);
+  if (!b) return;
+  editId = id;
+  el('e-title').value  = b.title;
+  el('e-author').value = b.author  || '';
+  el('e-isbn').value   = b.isbn    || '';
+  el('e-price').value  = b.price   || '';
+  el('e-cost').value   = b.cost    || '';
+  el('e-status').value = b.status;
+  el('e-listed').value = b.listedDate || '';
+  el('e-sold').value   = b.soldDate   || '';
+  el('e-memo').value   = b.memo       || '';
+  show('overlay');
+}
+function onOverlayClick(e) { if (e.target === el('overlay')) closeModal(); }
+function closeModal() { hide('overlay'); editId = null; }
+
+function saveBook() {
+  if (!editId) return;
+  const i = books.findIndex(b => b.id === editId);
+  if (i === -1) return;
+  const title = el('e-title').value.trim();
+  if (!title) { alert('タイトルは必須です'); return; }
+  books[i] = {
+    ...books[i],
+    title,
+    author:     el('e-author').value.trim(),
+    isbn:       el('e-isbn').value.trim(),
+    price:      Number(el('e-price').value) || 0,
+    cost:       Number(el('e-cost').value)  || 0,
+    status:     el('e-status').value,
+    listedDate: el('e-listed').value,
+    soldDate:   el('e-sold').value,
+    memo:       el('e-memo').value.trim(),
+  };
+  persist(); renderAll(); closeModal();
+}
+
+function deleteBook() {
+  if (!editId) return;
+  const b = books.find(b => b.id === editId);
+  if (!confirm(`「${b?.title}」を削除しますか？`)) return;
+  books = books.filter(b => b.id !== editId);
+  persist(); renderAll(); closeModal();
+}
+
+// ── Utils ─────────────────────────────────────────────────
+const el  = id => document.getElementById(id);
+const hide = id => el(id).classList.add('hidden');
+const show = id => el(id).classList.remove('hidden');
+const today = () => new Date().toISOString().slice(0,10);
+const uid   = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const esc   = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const persist = () => localStorage.setItem('m_books', JSON.stringify(books));
+</script>
+</body>
+</html>
