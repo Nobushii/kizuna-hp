@@ -457,11 +457,11 @@ let recog    = null;
 // ── API Key ───────────────────────────────────────────────
 function saveApiKey() {
   const v = document.getElementById('api-key-input').value.trim();
-  if (!v.startsWith('sk-ant-')) { alert('APIキーは sk-ant- で始まります'); return; }
+  if (!v) { alert('APIキーを入力してください'); return; }
   apiKey = v;
   localStorage.setItem('m_apikey', apiKey);
   hide('api-banner');
-  sysMsg('APIキーを保存しました。');
+  sysMsg('APIキーを保存しました。準備完了です！');
 }
 
 // ── Render ────────────────────────────────────────────────
