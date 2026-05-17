@@ -443,9 +443,18 @@
 </div>
 
 <script>
+// ── Utils ────────────────────────────────────────────────
+const el      = id => document.getElementById(id);
+const hide    = id => el(id).classList.add('hidden');
+const show    = id => el(id).classList.remove('hidden');
+const today   = () => new Date().toISOString().slice(0,10);
+const uid     = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const esc     = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const persist = () => localStorage.setItem('m_books', JSON.stringify(books));
+
 // ── State ────────────────────────────────────────────────
 let books    = [];
-let history  = [];   // chat history [{role,content}]
+let history  = [];
 let filter   = 'all';
 let editId   = null;
 let apiKey   = '';
@@ -762,14 +771,6 @@ function deleteBook() {
   persist(); renderAll(); closeModal();
 }
 
-// ── Utils ─────────────────────────────────────────────────
-const el  = id => document.getElementById(id);
-const hide = id => el(id).classList.add('hidden');
-const show = id => el(id).classList.remove('hidden');
-const today = () => new Date().toISOString().slice(0,10);
-const uid   = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-const esc   = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const persist = () => localStorage.setItem('m_books', JSON.stringify(books));
 </script>
 </body>
 </html>
