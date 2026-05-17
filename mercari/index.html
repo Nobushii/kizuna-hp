@@ -66,41 +66,6 @@
     .stat.s-profit .stat-value { color: var(--green); }
     .neg { color: var(--red) !important; }
 
-    /* API Banner */
-    .api-banner {
-      background: #1e1216;
-      border-bottom: 1px solid var(--red);
-      padding: 12px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .api-banner span { font-size: 13px; color: var(--red); }
-    .api-banner input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: var(--mono);
-      outline: none;
-      min-height: 44px;
-    }
-    .api-banner button {
-      width: 100%;
-      background: var(--red);
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
-      font-weight: 700;
-      min-height: 48px;
-    }
     .hidden { display: none !important; }
 
     /* Layout */
@@ -379,12 +344,6 @@
   </div>
 </header>
 
-<div class="api-banner" id="api-banner">
-  <span>🔑 Anthropic APIキー</span>
-  <input type="password" id="api-key-input" placeholder="sk-ant-..." />
-  <button onclick="saveApiKey()">保存</button>
-</div>
-
 <main>
   <div class="inv-panel">
     <div class="filter-tabs">
@@ -458,29 +417,17 @@ let books    = [];
 let history  = [];
 let filter   = 'all';
 let editId   = null;
-let apiKey   = '';
 let loading  = false;
 let isRec    = false;
 let recog    = null;
 
 // ── Boot ─────────────────────────────────────────────────
 (function init() {
-  books  = JSON.parse(localStorage.getItem('m_books') || '[]');
-  apiKey = localStorage.getItem('m_apikey') || '';
-  if (apiKey) hide('api-banner');
+  books = JSON.parse(localStorage.getItem('m_books') || '[]');
   renderAll();
   sysMsg('こんにちは！在庫の操作を自然言語で話しかけてください。\n例：「ワンピース1巻を300円で仕入れ500円で出品した」');
 })();
 
-// ── API Key ───────────────────────────────────────────────
-function saveApiKey() {
-  const v = document.getElementById('api-key-input').value.trim();
-  if (!v) { alert('APIキーを入力してください'); return; }
-  apiKey = v;
-  localStorage.setItem('m_apikey', apiKey);
-  hide('api-banner');
-  sysMsg('APIキーを保存しました。準備完了です！');
-}
 
 // ── Render ────────────────────────────────────────────────
 function renderAll() { renderStats(); renderBooks(); renderCounts(); }
@@ -582,12 +529,6 @@ async function sendMessage() {
   const text = inp.value.trim();
   if (!text) return;
 
-  if (!apiKey) {
-    document.getElementById('api-banner').classList.remove('hidden');
-    sysMsg('APIキーを上のバナーから入力してください。');
-    return;
-  }
-
   inp.value = ''; inp.style.height = 'auto';
   appendMsg('user', text);
   history.push({ role: 'user', content: text });
@@ -672,20 +613,15 @@ ${JSON.stringify(books.map(b => ({ id:b.id, title:b.title, author:b.author, pric
 - 複数冊はactionsの配列で処理
 - 在庫操作なしの質問はaction:"none"`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: sys,
       messages: history.slice(-12),
-    })
+    }),
   });
 
   if (!res.ok) {
