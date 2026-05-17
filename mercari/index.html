@@ -21,6 +21,10 @@
       --sans: 'Noto Sans JP', sans-serif;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    a, button, [onclick], .ftab, .book-card, .btn, .btn-icon {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
     body {
       font-family: var(--sans);
       background: var(--bg);
@@ -88,10 +92,11 @@
       background: var(--red);
       color: white;
       border: none;
-      padding: 6px 16px;
+      padding: 10px 20px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 14px;
+      min-height: 44px;
     }
     .hidden { display: none !important; }
 
@@ -270,7 +275,7 @@
     .chat-input:focus { border-color: var(--yellow); }
     .chat-input::placeholder { color: var(--muted); }
     .btn-icon {
-      width: 40px; height: 40px;
+      width: 44px; height: 44px;
       border-radius: 50%;
       border: 1px solid var(--border);
       background: var(--surface2);
